@@ -1,59 +1,115 @@
 (ns ui.core
   (:require [reagent.core :as reagent :refer [atom]]
-            [clojure.string :as string :refer [split-lines]]))
+            [clojure.core :as core]
+            [clojure.string :as string :refer [split-lines includes? trim]]
+            ))
 
-(def join-lines (partial string/join "\n"))
+(def electron       (js/require "electron"))
+
+(def ipc            (.-ipcRenderer electron))
+
 
 (enable-console-print!)
 
-(defonce state        (atom 0))
-(defonce shell-result (atom ""))
-(defonce command      (atom ""))
+(def shell (js/require "shell"))
+
+(def fs (js/require "fs"))
+(def path (js/require "path"))
+(def current-dir (.resolve path "."))
+
+(def filename (str current-dir "/bounce.config"))
+(def commandFile (.readFileSync fs filename))
+(def commands-broken (map #(string/split %1 #",") (split-lines commandFile)))
+                 
+(def command-map (apply merge (map #(hash-map (.toLowerCase (first %1)) (vec (rest %1))) commands-broken)))
+(def commands (keys command-map))
+(def currentCommand (atom nil))
+
+(def join-lines (partial string/join "\n"))
+
+(defonce searchText   (atom ""))
+(defonce matches      (atom []))
+
+(js/Notification. "Bounce" (clj->js {:body "Thanks for being an early adoptor of bounce."}))
 
 (defonce proc (js/require "child_process"))
 
-(defn append-to-out [out]
-  (swap! shell-result str out))
+(defn findit []
+  (if (empty? (trim @searchText))
+    []
+    (vec 
+      (filter 
+        (fn [command] 
+          (and 
+            (not (empty? command)) 
+            (every? #(includes? command (trim %1)) (string/split @searchText " "))))
+      commands))))
 
-(defn run-process []
-  (when-not (empty? @command)
-    (println "Running command" @command)
-    (let [[cmd & args] (string/split @command #"\s")
-          js-args (clj->js (or args []))
-          p (.spawn proc cmd js-args)]
-      (.on p "error" (comp append-to-out
-                           #(str % "\n")))
-      (.on (.-stderr p) "data" append-to-out)
-      (.on (.-stdout p) "data" append-to-out))
-    (reset! command "")))
+
+(defn runCommand []
+
+  (let [s (println command-map )
+        a @matches
+        b @currentCommand
+        z (get @matches @currentCommand)
+        _ (println a b z)
+        [type data] (command-map z)
+        _ (println (str type data))]
+    (do
+      (cond (= type "link") (.openExternal shell data)
+          :else (.openItem shell data))))
+      (.send ipc "abort"))
+
+
+
+(defn changeCurrentCommand [movement]
+  (do
+    (when (not (nil? @currentCommand))
+      (reset! currentCommand (movement @currentCommand)))
+    (reset! currentCommand (max @currentCommand 0))
+    (reset! currentCommand (min @currentCommand (- (count @matches) 1)))
+  ))
+
+
+
+(defn selectCommand [event]
+ (println (.-keyCode event)) 
+ (cond (= 13 (.-keyCode event)) (runCommand)
+       (= 40 (.-keyCode event)) (changeCurrentCommand #(+ %1 1))
+       (= 38 (.-keyCode event)) (changeCurrentCommand #(- %1 1))))
+
+
 
 (defn root-component []
-  [:div
-   [:div.logos
-    [:img.electron {:src "img/electron-logo.png"}]
-    [:img.cljs {:src "img/cljs-logo.svg"}]
-    [:img.reagent {:src "img/reagent-logo.png"}]]
-   [:pre "Versions:"
-    [:p (str "Node     " js/process.version)]
-    [:p (str "Electron " ((js->clj js/process.versions) "electron"))]
-    [:p (str "Chromium " ((js->clj js/process.versions) "chrome"))]]
-   [:button
-    {:on-click #(swap! state inc)}
-    (str "Clicked " @state " times")]
-   [:p
-    [:form
-     {:on-submit (fn [e]
-                   (.preventDefault e)
-                   (run-process))}
-     [:input#command
-      {:type :text
-       :on-change (fn [e]
-                    (reset! command
-                            (.-value (.-target e))))
-       :value @command
-       :placeholder "type in shell command"}]]]
-   [:pre (join-lines (take 100 (reverse (split-lines @shell-result))))]])
+  (let
+      []
+   ;[d (.send ipc "update-preference" (clj->js {:open-window-shortcut "ctrl+j"}) true)]
+    
+    [:div
+      [:p.hide (str @currentCommand "/" (count @matches))]
+      [:div
+       [:input.search-bar
+        {:type :text
+         :on-key-down (fn [e] (selectCommand e))
+         :on-change (fn [e]
+                      (do (reset! searchText
+                              (.-value (.-target e)))
+                          (reset! matches (vec (take 5 (findit))))
+                          (reset! currentCommand 0)))
+         :value @searchText
+         :placeholder "Bounce Search"
+         :auto-focus true}]
+       ]
+
+     [:ol.search-results (for [item @matches] 
+        ^{:key item} [:li.search-item {:class (if (= (.indexOf @matches item) @currentCommand) "current" "")} item])]]
+     ))
+
 
 (reagent/render
   [root-component]
   (js/document.getElementById "app-container"))
+
+(.send ipc "update-preference"  "ctrl+j"  true)
+
+

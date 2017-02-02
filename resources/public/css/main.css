@@ -1,4 +1,45 @@
-.logos img {
-  width: 100px;
-  margin-left: 5px;
+body {
+  background: #bf7fff;
+  color: #f2e5ff;
+  font: 40px Arial, Helvetica, sans-serif;
+}
+
+::-webkit-input-placeholder { 
+  color: #f2e5ff;
+}
+
+.search-bar {
+    -webkit-box-sizing: border-box;
+    outline: none;
+    display: block;
+    width: 100%;
+    padding: 7px;
+    border: none;
+    border-bottom: 1px solid  #f2e5ff;
+    background: transparent;
+    margin-bottom: 10px;
+    font-size: 40px;
+    height: 50px;
+    cursor: none;
+    color: #f2e5ff;
+}
+
+
+.hide {
+  display: none;
+}
+
+.current {
+  background: #ff98ff;
+}
+
+.search-results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.search-item {
+  margin: 0;
+  padding: 5px;
 }

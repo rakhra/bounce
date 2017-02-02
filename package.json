@@ -1,5 +1,16 @@
 {
   "name": "hello-world",
   "version": "0.1.0",
-  "main": "resources/main.js"
+  "main": "resources/main.js",
+  "dependencies": {
+    "menubar": "*"
+  },
+  "devDependencies": {
+    "electron-packager": "^5.1.0",
+    "electron-prebuilt": "^0.36.0"
+  },
+  "scripts": {
+    "build": "electron-packager . Chirp --platform=win32 --arch=x64 --version=0.36.0",
+    "start": "electron ."
+  }
 }
